@@ -1,0 +1,41 @@
+{
+  "name": "dsh-background-nakfaai",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "A DeepSeek Harness background skin: per-zone (left bar / main / right workbench) background images with a picker and strength control.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/themoneyofenoch/dsh-background-nakfaai.git"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh-plugin",
+    "skin",
+    "background",
+    "theme"
+  ],
+  "license": "MIT",
+  "main": "plugin/index.js",
+  "exports": {
+    ".": "./plugin/index.js",
+    "./client": "./plugin/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "plugin/index.js",
+    "plugin/client.js",
+    "cordis.patch.yml",
+    "plugin/assets/",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [],
+      "platform": "web"
+    }
+  }
+}

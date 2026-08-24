@@ -1,0 +1,5 @@
+# dsh-background-nakfaai bundle layer. Installed with:
+#   dsh plugin --profile web add github:themoneyofenoch/dsh-background-nakfaai
+- insert:
+    - id: sidebar-bg
+      name: 'dsh-background-nakfaai'
