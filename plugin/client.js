@@ -177,10 +177,25 @@ window.__ModuleLoader__.load({ id: '@nakfaai/sidebar-bg', factory: (require) => 
         btn.style.top = 'auto';
       }
     };
+    // Keep the button pinned like the skin icon: re-anchor whenever the DOM
+    // changes or the window resizes (MutationObserver + resize + rAF), so it
+    // never drifts when the page moves.
+    var placementFrame = 0;
+    var schedulePlace = function() {
+      if (window.cancelAnimationFrame) window.cancelAnimationFrame(placementFrame);
+      if (window.requestAnimationFrame) placementFrame = window.requestAnimationFrame(placeButton);
+      else placeButton();
+    };
     placeButton();
-    if (window.requestAnimationFrame) { window.requestAnimationFrame(placeButton); }
-    var tries = 0;
-    btn._placeTimer = setInterval(function(){ placeButton(); if (++tries > 10) clearInterval(btn._placeTimer); }, 1200);
+    if (window.addEventListener) window.addEventListener('resize', schedulePlace);
+    if (window.MutationObserver) {
+      try {
+        btn._placeObserver = new MutationObserver(schedulePlace);
+        btn._placeObserver.observe(document.body || document.documentElement, { childList: true, subtree: true, attributes: true });
+      } catch (e) {}
+    }
+    // A light interval as a safety net (in case the observer misses an edge case).
+    btn._placeTimer = setInterval(function(){ placeButton(); }, 1500);
   }
 
   exports.name = '@nakfaai/sidebar-bg';
