@@ -17,9 +17,12 @@ window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) 
   function saveZones(z) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(z)); } catch (e) {} }
 
   function imgOverlay(url, strength) {
-    // strength 0..1: 0 = transparent (bright image), 1 = opaque dark (text readable).
+    // strength 0..1: 0 = transparent (bright image), 1 = darkest allowed.
+    // The overlay never goes fully opaque (max alpha 0.90), so the picture
+    // stays at least dimly visible even at 100%.
     var s = Math.max(0, Math.min(1, strength == null ? 0.5 : Number(strength)));
-    return 'linear-gradient(rgba(8,10,16,' + (s * 0.8).toFixed(2) + '), rgba(8,10,16,' + s.toFixed(2) + ')), url("' + url + '")';
+    var a = s * 0.9; // 0..0.90 — never fully hides the photo
+    return 'linear-gradient(rgba(8,10,16,' + (a * 0.8).toFixed(2) + '), rgba(8,10,16,' + a.toFixed(2) + ')), url("' + url + '")';
   }
 
   function injectCss() {
@@ -29,7 +32,7 @@ window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) 
     css.push('/* ---- sidebar-bg: per-zone backgrounds (editable via picker) ---- */');
     // Left sidebar — the left zone always shows an image (stale/empty
     // saved values fall back to the bundled default instead of blanking).
-    var leftSt = (zones.strength && zones.strength.left) || 0.6;
+    var leftSt = (zones.strength && zones.strength.left != null) ? zones.strength.left : 0.6;
     var leftVal = zones.left || DEFAULT.left;
     var leftBg = imgOverlay(leftVal, leftSt);
     css.push('div[class*="sidebarCol"][class*="sidebarCol"] { background-image: ' + leftBg + ' !important; background-size: cover !important; background-position: center !important; background-repeat: no-repeat !important; background-color: transparent !important; }');
@@ -38,7 +41,7 @@ window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) 
     // does not cover the top of the sidebar image.
     css.push('div[class*="newSession"] { background: rgba(255,255,255,0.10) !important; box-shadow: none !important; }');
     // Main / center
-    var mainSt = (zones.strength && zones.strength.main) || 0.4;
+    var mainSt = (zones.strength && zones.strength.main != null) ? zones.strength.main : 0.4;
     var mainBg = zones.main ? imgOverlay(zones.main, mainSt) : 'none';
     css.push('div[class*="centerCol"] { background-image: ' + mainBg + ' !important; background-size: cover !important; background-position: center !important; background-repeat: no-repeat !important; background-attachment: fixed !important; }');
     css.push('div[class*="frame"] { background-image: ' + mainBg + ' !important; background-size: cover !important; background-position: center !important; background-repeat: no-repeat !important; background-attachment: fixed !important; }');
@@ -46,7 +49,7 @@ window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) 
     // dsh-better-sidebar content panes (wxwsGW_*) that render inside it.
     // The right zone always shows an image (falls back to the bundled one),
     // matching the left zone.
-    var rightSt = (zones.strength && zones.strength.right) || 0.5;
+    var rightSt = (zones.strength && zones.strength.right != null) ? zones.strength.right : 0.5;
     var rightVal = zones.right || DEFAULT.right;
     var rightBg = imgOverlay(rightVal, rightSt);
     css.push('div[class*="_panel"], div[class*="_pane"], div[class*="workbench"], div[class*="bottomPanel"] { background-image: ' + rightBg + ' !important; background-size: cover !important; background-position: center !important; background-repeat: no-repeat !important; }');
