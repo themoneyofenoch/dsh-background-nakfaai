@@ -24,13 +24,11 @@ Then **hard-refresh the browser** (Cmd/Ctrl+Shift+R). Click the **🌌** button 
 
 ## 🖼️ Add your own images
 
-Drop image files (`.png` / `.jpg` / `.webp` / `.avif`) into a folder and set `SIDEBAR_BG_DIR` to it, e.g.:
+Drop image files (`.png` / `.jpg` / `.webp` / `.avif`) into `~/.dsh/background` — the picker lists them automatically on the next restart, no configuration needed. To use a different folder instead, set `SIDEBAR_BG_DIR`:
 
 ```sh
 SIDEBAR_BG_DIR=~/dsh-backgrounds dsh web
 ```
-
-The picker lists bundled images plus anything in that folder.
 
 > If the picker shows **"Loading images…"** with an error, the host routes need the harness restarted — restart `dsh web`, then hard-refresh.
 

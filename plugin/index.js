@@ -3,11 +3,13 @@
  * Paints the left bar, main chat, and right workbench panel with per-zone
  * images, with a small picker (per-zone image + strength slider).
  *
- * Bundled images in ./assets are always available. Users may add their own
- * images via SIDEBAR_BG_DIR (a folder of .png/.jpg/.webp/.avif) — optional.
+ * Bundled images in ./assets are always available. Any images dropped into
+ * ~/.dsh/background are picked up automatically; SIDEBAR_BG_DIR overrides that
+ * default folder (a folder of .png/.jpg/.webp/.avif).
  */
 import { readFile, readdir } from 'node:fs/promises'
 import { resolve, extname, join } from 'node:path'
+import { homedir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 
 export const name = 'sidebar-bg'
@@ -15,8 +17,9 @@ export const inject = ['webServer']
 
 const ROUTE = '/sidebar-bg'
 const ASSET_ROOT = resolve(fileURLToPath(new URL('./assets/', import.meta.url)))
-// Optional extra image folder the user provides. Works without it (bundled assets only).
-const BG_DIR = process.env.SIDEBAR_BG_DIR || null
+// User images: default to ~/.dsh/background (a folder DSH users already have);
+// SIDEBAR_BG_DIR overrides it. A missing folder is fine — bundled assets only.
+const BG_DIR = process.env.SIDEBAR_BG_DIR || join(homedir(), '.dsh', 'background')
 
 const MIME = Object.freeze({
   '.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg',
