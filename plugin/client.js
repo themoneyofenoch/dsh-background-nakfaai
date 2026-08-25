@@ -1,6 +1,6 @@
 // sidebar-bg client half — paints the left/main/right zones with per-zone images
 // and provides a small picker (button + panel) to change each one yourself.
-window.__ModuleLoader__.load({ id: '@nakfaai/sidebar-bg', factory: (require) => {
+window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) => {
   var module = { exports: {} };
   var exports = module.exports;
 
@@ -198,7 +198,7 @@ window.__ModuleLoader__.load({ id: '@nakfaai/sidebar-bg', factory: (require) => 
     btn._placeTimer = setInterval(function(){ placeButton(); }, 1500);
   }
 
-  exports.name = '@nakfaai/sidebar-bg';
+  exports.name = 'dsh-background-nakfaai';
   exports.inject = [];
   exports.apply = function apply(ctx) {
     function init() {
