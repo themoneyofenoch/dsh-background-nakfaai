@@ -8,7 +8,7 @@ window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) 
   var PANEL_ID = 'sidebar-bg-panel';
   var BTN_ID = 'sidebar-bg-btn';
   var STORAGE_KEY = 'sidebar-bg-zones';
-  var DEFAULT = { left: '/sidebar-bg/sidebar.webp', main: '/sidebar-bg/sidebar.webp', right: null, strength: { left: 0.6, main: 0.4, right: 0.5 } };
+  var DEFAULT = { left: '/sidebar-bg/sidebar.webp', main: '/sidebar-bg/sidebar.webp', right: '/sidebar-bg/sidebar.webp', strength: { left: 0.6, main: 0.4, right: 0.5 } };
 
   function loadZones() {
     try { var v = localStorage.getItem(STORAGE_KEY); if (v) return Object.assign({}, DEFAULT, JSON.parse(v)); } catch (e) {}
@@ -42,15 +42,21 @@ window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) 
     var mainBg = zones.main ? imgOverlay(zones.main, mainSt) : 'none';
     css.push('div[class*="centerCol"] { background-image: ' + mainBg + ' !important; background-size: cover !important; background-position: center !important; background-repeat: no-repeat !important; background-attachment: fixed !important; }');
     css.push('div[class*="frame"] { background-image: ' + mainBg + ' !important; background-size: cover !important; background-position: center !important; background-repeat: no-repeat !important; background-attachment: fixed !important; }');
-    // Right bar: the dsh-better-sidebar workbench panel (not the harness detailsCol).
+    // Right bar: the harness workbench panel (nArs4W_*) plus the
+    // dsh-better-sidebar content panes (wxwsGW_*) that render inside it.
+    // The right zone always shows an image (falls back to the bundled one),
+    // matching the left zone.
     var rightSt = (zones.strength && zones.strength.right) || 0.5;
-    var rightBg = zones.right ? imgOverlay(zones.right, rightSt) : 'none';
-    css.push('div[class*="_panel"], div[class*="_pane"] { background-image: ' + rightBg + ' !important; background-size: cover !important; background-position: center !important; background-repeat: no-repeat !important; }');
+    var rightVal = zones.right || DEFAULT.right;
+    var rightBg = imgOverlay(rightVal, rightSt);
+    css.push('div[class*="_panel"], div[class*="_pane"], div[class*="workbench"], div[class*="bottomPanel"] { background-image: ' + rightBg + ' !important; background-size: cover !important; background-position: center !important; background-repeat: no-repeat !important; }');
     // Strip the opaque inner surfaces that would otherwise cover the zone
-    // images (DSH 0.1.1-rc.2 web DOM: hHd-Xa_root / wSkVaW_root / nArs4W_*).
+    // images (DSH 0.1.1-rc.2 web DOM: hHd-Xa_root / wSkVaW_root / nArs4W_*),
+    // and the dsh-better-sidebar content panes that sit inside the workbench.
     css.push('div[class*="sidebarCol"] div[class*="root"], div[class*="sidebarCol"] div[class*="quietBars"] { background: transparent !important; }');
     css.push('div[class*="centerCol"] div[class*="root"] { background: transparent !important; }');
-    css.push('div[class*="_panel"], div[class*="_pane"], div[class*="_tabBar"] { background: transparent !important; }');
+    css.push('div[class*="_panel"], div[class*="_pane"], div[class*="_tabBar"], div[class*="bottomPanel"] { background: transparent !important; }');
+    css.push('div[class*="wxwsGW_jobs"], div[class*="wxwsGW_subagent"] { background: transparent !important; }');
     var style = document.getElementById(STYLE_ID);
     if (!style) { style = document.createElement('style'); style.id = STYLE_ID; document.head.appendChild(style); }
     style.textContent = css.join('\n');
@@ -113,7 +119,7 @@ window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) 
         // option "None" (only main/right can be none)
         if (key !== 'left') {
           var noneOpt = document.createElement('option');
-          noneOpt.value = ''; noneOpt.textContent = '(default / hide)';
+          noneOpt.value = ''; noneOpt.textContent = key === 'right' ? '(default)' : '(default / hide)';
           sel.appendChild(noneOpt);
         }
         images.forEach(function(im){
