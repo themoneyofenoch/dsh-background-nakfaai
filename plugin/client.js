@@ -18,7 +18,7 @@ window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) 
 
   function imgOverlay(url, strength) {
     // strength 0..1: 0 = transparent (bright image), 1 = opaque dark (text readable).
-    var s = Math.max(0.05, Math.min(0.95, strength == null ? 0.5 : Number(strength)));
+    var s = Math.max(0, Math.min(1, strength == null ? 0.5 : Number(strength)));
     return 'linear-gradient(rgba(8,10,16,' + (s * 0.8).toFixed(2) + '), rgba(8,10,16,' + s.toFixed(2) + ')), url("' + url + '")';
   }
 
@@ -88,7 +88,7 @@ window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) 
       strLabel.style.cssText = 'color:#8b93a3;font-size:11px;width:42px';
       var strInput = document.createElement('input');
       strInput.type = 'range';
-      strInput.min = '5'; strInput.max = '95'; strInput.step = '5';
+      strInput.min = '0'; strInput.max = '100'; strInput.step = '5';
       strInput.dataset.strengthZone = key;
       strInput.style.cssText = 'flex:1;accent-color:#4f8cff';
       var strVal = document.createElement('span');
