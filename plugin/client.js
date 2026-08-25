@@ -27,11 +27,16 @@ window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) 
     var css = [];
     // ALL zones share custom props; each rule reads its own.
     css.push('/* ---- sidebar-bg: per-zone backgrounds (editable via picker) ---- */');
-    // Left sidebar
+    // Left sidebar — the left zone always shows an image (stale/empty
+    // saved values fall back to the bundled default instead of blanking).
     var leftSt = (zones.strength && zones.strength.left) || 0.6;
-    var leftBg = zones.left ? imgOverlay(zones.left, leftSt) : 'none';
+    var leftVal = zones.left || DEFAULT.left;
+    var leftBg = imgOverlay(leftVal, leftSt);
     css.push('div[class*="sidebarCol"][class*="sidebarCol"] { background-image: ' + leftBg + ' !important; background-size: cover !important; background-position: center !important; background-repeat: no-repeat !important; background-color: transparent !important; }');
     css.push('div[class*="sidebarCol"][class*="sidebarCol"] a, div[class*="sidebarCol"][class*="sidebarCol"] button, div[class*="sidebarCol"][class*="sidebarCol"] span, div[class*="sidebarCol"][class*="sidebarCol"] div { text-shadow: 0 1px 2px rgba(0,0,0,0.6); }');
+    // The "New session" CTA is a solid white slab; make it translucent so it
+    // does not cover the top of the sidebar image.
+    css.push('div[class*="newSession"] { background: rgba(255,255,255,0.10) !important; box-shadow: none !important; }');
     // Main / center
     var mainSt = (zones.strength && zones.strength.main) || 0.4;
     var mainBg = zones.main ? imgOverlay(zones.main, mainSt) : 'none';
