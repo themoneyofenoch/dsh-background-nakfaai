@@ -17,12 +17,10 @@ window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) 
   function saveZones(z) { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(z)); } catch (e) {} }
 
   function imgOverlay(url, strength) {
-    // strength 0..1: 0 = transparent (bright image), 1 = darkest allowed.
-    // The overlay never goes fully opaque (max alpha 0.90), so the picture
-    // stays at least dimly visible even at 100%.
+    // strength 0..1: 0 = fully transparent (photo at full brightness),
+    // 1 = fully opaque dark (photo completely hidden, text fully readable).
     var s = Math.max(0, Math.min(1, strength == null ? 0.5 : Number(strength)));
-    var a = s * 0.9; // 0..0.90 — never fully hides the photo
-    return 'linear-gradient(rgba(8,10,16,' + (a * 0.8).toFixed(2) + '), rgba(8,10,16,' + a.toFixed(2) + ')), url("' + url + '")';
+    return 'linear-gradient(rgba(8,10,16,' + s.toFixed(2) + '), rgba(8,10,16,' + s.toFixed(2) + ')), url("' + url + '")';
   }
 
   function injectCss() {
