@@ -40,8 +40,12 @@ window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) 
     // Right bar: the dsh-better-sidebar workbench panel (not the harness detailsCol).
     var rightSt = (zones.strength && zones.strength.right) || 0.5;
     var rightBg = zones.right ? imgOverlay(zones.right, rightSt) : 'none';
-    css.push('div[class*="workbench"] { background-image: ' + rightBg + ' !important; background-size: cover !important; background-position: center !important; background-repeat: no-repeat !important; }');
-    css.push('div[class*="panel"][class*="workbench"], div[class*="paneContent"] { background: transparent !important; }');
+    css.push('div[class*="_panel"], div[class*="_pane"] { background-image: ' + rightBg + ' !important; background-size: cover !important; background-position: center !important; background-repeat: no-repeat !important; }');
+    // Strip the opaque inner surfaces that would otherwise cover the zone
+    // images (DSH 0.1.1-rc.2 web DOM: hHd-Xa_root / wSkVaW_root / nArs4W_*).
+    css.push('div[class*="sidebarCol"] div[class*="root"], div[class*="sidebarCol"] div[class*="quietBars"] { background: transparent !important; }');
+    css.push('div[class*="centerCol"] div[class*="root"] { background: transparent !important; }');
+    css.push('div[class*="_panel"], div[class*="_pane"], div[class*="_tabBar"] { background: transparent !important; }');
     var style = document.getElementById(STYLE_ID);
     if (!style) { style = document.createElement('style'); style.id = STYLE_ID; document.head.appendChild(style); }
     style.textContent = css.join('\n');
