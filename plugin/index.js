@@ -47,7 +47,7 @@ async function serveAsset(req, res) {
 async function serveUserFile(req, res) {
   if (!BG_DIR) { res.writeHead(404); res.end(); return }
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405, { allow: 'GET, HEAD' }); res.end(); return }
-  const rel = safe(new URL(req.url ?? ROUTE, 'http://dsh.local').pathname.replace('/file/', '').slice(0))
+  const rel = safe(new URL(req.url ?? ROUTE, 'http://dsh.local').pathname.slice('/sidebar-bg/file/'.length))
   if (!rel) { res.writeHead(404); res.end(); return }
   const full = resolve(BG_DIR, rel)
   if (!full.startsWith(BG_DIR)) { res.writeHead(403); res.end(); return }
@@ -73,7 +73,7 @@ async function serveListing(req, res) {
       .map((f) => ({ name: f, url: '/sidebar-bg/file/' + encodeURIComponent(f) }))
   }
   res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-cache' })
-  res.end(JSON.stringify({ images: bundled.concat(user) }))
+  res.end(JSON.stringify({ dir: BG_DIR || null, images: bundled.concat(user) }))
 }
 
 export function apply(ctx) {
