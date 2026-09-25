@@ -8,6 +8,10 @@ window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) 
   var PANEL_ID = 'sidebar-bg-panel';
   var BTN_ID = 'sidebar-bg-btn';
   var STORAGE_KEY = 'sidebar-bg-zones';
+  // React comes from the client module table (a platform seed). Guarded so an
+  // older shell without it still gets the floating picker below.
+  var react = null;
+  try { react = require('react'); } catch (e) { react = null; }
   var DEFAULT = { left: '/sidebar-bg/sidebar.webp', main: '/sidebar-bg/sidebar.webp', right: '/sidebar-bg/sidebar.webp', strength: { left: 0.6, main: 0.4, right: 0.5 } };
 
   function loadZones() {
@@ -231,6 +235,92 @@ window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) 
     btn._placeTimer = setInterval(function(){ placeButton(); }, 5000);
   }
 
+  // ---------------------------------------------------------------------------
+  // Plugins-page configuration (slot "plugins.bundle.config", keyed by package
+  // name). Renders the same three zones + strength controls as the floating
+  // picker, but inside the plugin's own page — no DOM anchor required, so it
+  // works in the desktop app where [data-testid="settings-trigger"] is gone.
+  // ---------------------------------------------------------------------------
+  var ZONE_LABELS = { left: 'Left bar', main: 'Main chat', right: 'Right bar' };
+
+  function zoneStrength(zones, key) {
+    var v = zones && zones.strength ? zones.strength[key] : null;
+    return v == null ? 0.5 : v;
+  }
+
+  function BackgroundConfig() {
+    var h = react.createElement;
+    var zonesState = react.useState(loadZones());
+    var zones = zonesState[0], setZones = zonesState[1];
+    var listState = react.useState({ dir: '', images: [] });
+    var listing = listState[0], setListing = listState[1];
+
+    react.useEffect(function () {
+      var alive = true;
+      fetch('/sidebar-bg/list.json').then(function (r) { return r.json(); }).then(function (d) {
+        if (alive) setListing({ dir: (d && d.dir) || '', images: (d && d.images) || [] });
+      }).catch(function () { if (alive) setListing({ dir: '', images: [] }); });
+      return function () { alive = false; };
+    }, []);
+
+    function commit(next) { setZones(next); saveZones(next); injectCss(); }
+    function pickImage(key, url) {
+      var next = Object.assign({}, zones);
+      next[key] = url || null;
+      commit(next);
+    }
+    function setStrength(key, value) {
+      var next = Object.assign({}, zones);
+      next.strength = Object.assign({}, zones.strength);
+      next.strength[key] = value;
+      commit(next);
+    }
+
+    var rows = ['left', 'main', 'right'].map(function (key) {
+      var options = [{ value: '', label: key === 'right' ? '(default)' : '(default / hide)' }]
+        .concat(listing.images.map(function (im) { return { value: im.url, label: im.name }; }));
+      var pct = Math.round(zoneStrength(zones, key) * 100);
+      return h('div', { key: key, style: { margin: '10px 0' } }, [
+        h('div', { key: 'label', style: { fontSize: 12, color: '#8b93a3', marginBottom: 4 } }, ZONE_LABELS[key]),
+        h('select', {
+          key: 'select',
+          value: zones[key] || '',
+          onChange: function (e) { pickImage(key, e.target.value); },
+          style: { width: '100%', padding: '6px', background: '#0d0f14', color: '#e6e8ee', border: '1px solid #2a2f3a', borderRadius: 6 }
+        }, options.map(function (o) { return h('option', { key: o.value || 'none', value: o.value }, o.label); })),
+        h('div', { key: 'strength', style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 } }, [
+          h('span', { key: 'a', style: { fontSize: 11, color: '#8b93a3', width: 42 } }, 'Strong'),
+          h('input', {
+            key: 'b',
+            type: 'range', min: 0, max: 100, step: 5, value: pct,
+            onChange: function (e) { setStrength(key, Number(e.target.value) / 100); },
+            style: { flex: 1, accentColor: '#4f8cff' }
+          }),
+          h('span', { key: 'c', style: { fontSize: 11, width: 38, textAlign: 'right' } }, pct + '%')
+        ])
+      ]);
+    });
+
+    return h('div', null, [
+      h('div', { key: 'title', style: { fontWeight: 700, fontSize: 14, marginBottom: 6 } }, 'Background'),
+      h('div', { key: 'hint', style: { fontSize: 12, color: '#8b93a3' } },
+        listing.dir ? ('Images in ' + listing.dir) : (listing.images.length ? '' : 'No images found — the bundled default is used')),
+      h('div', { key: 'rows' }, rows)
+    ]);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Settings section ("Background") — lives in the Settings left nav next to
+  // the theme/skin section, not on the Plugins page. Registers a settings
+  // section plus its own child slot, the same shape the skin plugin uses.
+  // ---------------------------------------------------------------------------
+  function BackgroundSection(props) {
+    var h = react.createElement;
+    var renderSlot = props && props.renderSlot;
+    return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
+      typeof renderSlot === 'function' ? renderSlot('settings.background.item', {}) : null);
+  }
+
   exports.name = 'dsh-background-nakfaai';
   exports.inject = [];
   exports.apply = function apply(ctx) {
@@ -245,6 +335,37 @@ window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) 
       init();
       if (++tries > 8) clearInterval(timer);
     }, 1000);
+    // Settings → "Background" section (next to the theme/skin section).
+    // "settings.section" is a list slot (needs id); its children table declares
+    // the row slot this plugin then fills.
+    if (react && ctx.slots && typeof ctx.slots.inject === 'function') {
+      var disposeSection = ctx.slots.inject('settings.section', function () {
+        try {
+          return ctx.slots.register({
+            name: 'settings.section',
+            id: 'sidebar-bg',
+            order: 12,
+            label: 'Background',
+            children: { 'settings.background.item': { kind: 'list', scope: 'root' } }
+          }, BackgroundSection);
+        } catch (e) { return undefined; }
+      });
+      var disposeRows = ctx.slots.inject('settings.background.item', function () {
+        try {
+          return ctx.slots.register({
+            name: 'settings.background.item',
+            id: 'sidebar-bg',
+            order: 10,
+            inject: function () { return {}; }
+          }, BackgroundConfig);
+        } catch (e) { return undefined; }
+      });
+      ctx.effect(function () {
+        if (typeof disposeRows === 'function') disposeRows();
+        if (typeof disposeSection === 'function') disposeSection();
+      }, 'sidebar-bg: settings section');
+    }
+
     // Full teardown: interval, observer, resize listener, safety timer, button,
     // picker and style tag — otherwise a reload leaves a second copy behind.
     ctx.effect(function () {

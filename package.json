@@ -1,6 +1,6 @@
 {
   "name": "dsh-background-nakfaai",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "type": "module",
   "description": "A DeepSeek Harness background skin: per-zone (left bar / main / right workbench) background images with a picker and strength control.",
   "repository": {
