@@ -50,13 +50,21 @@ window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) 
     var rightSt = (zones.strength && zones.strength.right != null) ? zones.strength.right : 0.5;
     var rightVal = zones.right || DEFAULT.right;
     var rightBg = imgOverlay(rightVal, rightSt);
-    css.push('div[class*="_panel"], div[class*="_pane"], div[class*="workbench"], div[class*="bottomPanel"] { background-image: ' + rightBg + ' !important; background-size: cover !important; background-position: center !important; background-repeat: no-repeat !important; }');
+    // Scoped to the right zone and its own panes: an app-wide [class*="_panel"]
+    // rule paints backgrounds onto unrelated dialogs too.
+    css.push('div[class*="sidebarRight"], div[class*="rightCol"], div[class*="workbench"], div[class*="bottomPanel"], div[class*="sidebarRight"] div[class*="_panel"], div[class*="sidebarRight"] div[class*="_pane"], div[class*="rightCol"] div[class*="_panel"], div[class*="rightCol"] div[class*="_pane"] { background-image: ' + rightBg + ' !important; background-size: cover !important; background-position: center !important; background-repeat: no-repeat !important; }');
     // Strip the opaque inner surfaces that would otherwise cover the zone
-    // images (DSH 0.1.1-rc.2 web DOM: hHd-Xa_root / wSkVaW_root / nArs4W_*),
-    // and the dsh-better-sidebar content panes that sit inside the workbench.
+    // images (hashed *_root / *_pane class fragments), and the sidebar content
+    // panes that sit inside the workbench.
+    // DSH 0.1.7-rc.2 renamed the right workbench: it is now `SidebarRight`
+    // (class fragments sidebarRight / rightCol) — the old `workbench` and
+    // `bottomPanel` fragments no longer exist, so both are kept for older cores.
     css.push('div[class*="sidebarCol"] div[class*="root"], div[class*="sidebarCol"] div[class*="quietBars"] { background: transparent !important; }');
     css.push('div[class*="centerCol"] div[class*="root"] { background: transparent !important; }');
-    css.push('div[class*="_panel"], div[class*="_pane"], div[class*="_tabBar"], div[class*="bottomPanel"] { background: transparent !important; }');
+    // Scoped: an unscoped [class*="_panel"] rule strips the background from
+    // every panel in the app (approval dialogs, todo/plan panels, ...).
+    css.push('div[class*="sidebarRight"], div[class*="rightCol"], div[class*="bottomPanel"] { background: transparent !important; }');
+    css.push('div[class*="sidebarRight"] div[class*="_panel"], div[class*="sidebarRight"] div[class*="_pane"], div[class*="sidebarRight"] div[class*="_tabBar"], div[class*="rightCol"] div[class*="_panel"], div[class*="rightCol"] div[class*="_pane"], div[class*="rightCol"] div[class*="_tabBar"] { background: transparent !important; }');
     css.push('div[class*="wxwsGW_jobs"], div[class*="wxwsGW_subagent"] { background: transparent !important; }');
     var style = document.getElementById(STYLE_ID);
     if (!style) { style = document.createElement('style'); style.id = STYLE_ID; document.head.appendChild(style); }
@@ -196,22 +204,31 @@ window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) 
     // Keep the button pinned like the skin icon: re-anchor whenever the DOM
     // changes or the window resizes (MutationObserver + resize + rAF), so it
     // never drifts when the page moves.
-    var placementFrame = 0;
+    // Debounced: a chat app mutates the DOM on every streaming token, and each
+    // anchor pass costs three querySelectors plus a forced layout.
+    var placementFrame = 0, placementDelay = 0;
     var schedulePlace = function() {
-      if (window.cancelAnimationFrame) window.cancelAnimationFrame(placementFrame);
-      if (window.requestAnimationFrame) placementFrame = window.requestAnimationFrame(placeButton);
-      else placeButton();
+      if (placementDelay) clearTimeout(placementDelay);
+      placementDelay = setTimeout(function() {
+        placementDelay = 0;
+        if (window.requestAnimationFrame) {
+          if (placementFrame && window.cancelAnimationFrame) window.cancelAnimationFrame(placementFrame);
+          placementFrame = window.requestAnimationFrame(placeButton);
+        } else placeButton();
+      }, 120);
     };
     placeButton();
+    btn._placeListener = schedulePlace;
     if (window.addEventListener) window.addEventListener('resize', schedulePlace);
     if (window.MutationObserver) {
       try {
         btn._placeObserver = new MutationObserver(schedulePlace);
-        btn._placeObserver.observe(document.body || document.documentElement, { childList: true, subtree: true, attributes: true });
+        // childList only — `attributes: true` fires on every class/style tweak.
+        btn._placeObserver.observe(document.body || document.documentElement, { childList: true, subtree: true });
       } catch (e) {}
     }
-    // A light interval as a safety net (in case the observer misses an edge case).
-    btn._placeTimer = setInterval(function(){ placeButton(); }, 1500);
+    // Slow safety net (in case the observer misses an edge case).
+    btn._placeTimer = setInterval(function(){ placeButton(); }, 5000);
   }
 
   exports.name = 'dsh-background-nakfaai';
@@ -228,7 +245,22 @@ window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) 
       init();
       if (++tries > 8) clearInterval(timer);
     }, 1000);
-    ctx.effect(function () { clearInterval(timer); }, 'sidebar-bg: picker');
+    // Full teardown: interval, observer, resize listener, safety timer, button,
+    // picker and style tag — otherwise a reload leaves a second copy behind.
+    ctx.effect(function () {
+      clearInterval(timer);
+      var btn = document.getElementById(BTN_ID);
+      if (btn) {
+        if (btn._placeObserver) { try { btn._placeObserver.disconnect(); } catch (e) {} }
+        if (btn._placeTimer) clearInterval(btn._placeTimer);
+        if (btn._placeListener && window.removeEventListener) window.removeEventListener('resize', btn._placeListener);
+        btn.remove();
+      }
+      var panel = document.getElementById(PANEL_ID);
+      if (panel) panel.remove();
+      var style = document.getElementById(STYLE_ID);
+      if (style) style.remove();
+    }, 'sidebar-bg: picker');
   };
 
   return module.exports;

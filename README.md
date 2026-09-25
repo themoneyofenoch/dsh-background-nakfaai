@@ -43,6 +43,8 @@ dsh plugin --profile web remove dsh-background-nakfaai
 - Host half registers routes on the harness web server to serve the bundled images and a JSON listing.
 - Client half injects per-zone CSS and a small picker; choices persist in the browser (`localStorage`).
 - Works for any DSH `0.1.x` release; no build step needed.
+- **v0.1.1** — right-panel hooks updated for DSH `0.1.7-rc.2`: the right workbench is now `SidebarRight` (`sidebarRight` / `rightCol` class fragments), replacing the old `workbench` / `bottomPanel`.
+- **v0.1.2** — image routes now serve images only (the user-file route no longer exposes arbitrary files in the background folder); the right-zone CSS is scoped so it stops stripping backgrounds from unrelated panels; the placement observer is debounced and `childList`-only; unload now tears down the observer, timers, listener, button and style tag.
 
 ## 📄 License
 

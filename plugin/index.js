@@ -8,7 +8,7 @@
  * default folder (a folder of .png/.jpg/.webp/.avif).
  */
 import { readFile, readdir } from 'node:fs/promises'
-import { resolve, extname, join } from 'node:path'
+import { resolve, extname, join, sep } from 'node:path'
 import { homedir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 
@@ -36,9 +36,9 @@ function safe(pathname) {
 async function serveAsset(req, res) {
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405, { allow: 'GET, HEAD' }); res.end(); return }
   const rel = safe(new URL(req.url ?? ROUTE, 'http://dsh.local').pathname.slice(ROUTE.length))
-  if (!rel) { res.writeHead(404); res.end(); return }
+  if (!rel || !IMG_EXT.has(extname(rel).toLowerCase())) { res.writeHead(404); res.end(); return }
   const full = resolve(ASSET_ROOT, rel)
-  if (!full.startsWith(ASSET_ROOT)) { res.writeHead(403); res.end(); return }
+  if (!full.startsWith(ASSET_ROOT + sep)) { res.writeHead(403); res.end(); return }
   try {
     const buf = await readFile(full)
     const type = MIME[extname(rel).toLowerCase()] ?? 'application/octet-stream'
@@ -51,9 +51,11 @@ async function serveUserFile(req, res) {
   if (!BG_DIR) { res.writeHead(404); res.end(); return }
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405, { allow: 'GET, HEAD' }); res.end(); return }
   const rel = safe(new URL(req.url ?? ROUTE, 'http://dsh.local').pathname.slice('/sidebar-bg/file/'.length))
-  if (!rel) { res.writeHead(404); res.end(); return }
+  // Images only. Without this the route serves ANY file in BG_DIR — a .env, a
+  // key, notes.txt — to any local client that asks for it.
+  if (!rel || !IMG_EXT.has(extname(rel).toLowerCase())) { res.writeHead(404); res.end(); return }
   const full = resolve(BG_DIR, rel)
-  if (!full.startsWith(BG_DIR)) { res.writeHead(403); res.end(); return }
+  if (!full.startsWith(BG_DIR + sep)) { res.writeHead(403); res.end(); return }
   try {
     const buf = await readFile(full)
     const type = MIME[extname(rel).toLowerCase()] ?? 'application/octet-stream'
