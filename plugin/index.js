@@ -4,11 +4,12 @@
  * images, with a small picker (per-zone image + strength slider).
  *
  * Bundled images in ./assets are always available. Any images dropped into
- * ~/.dsh/background are picked up automatically; SIDEBAR_BG_DIR overrides that
- * default folder (a folder of .png/.jpg/.webp/.avif).
+ * ~/.dsh/background are picked up automatically. More folders can be added
+ * read-only through the `sidebar-bg.json` config file (see CONFIG_FILE below),
+ * so the picker can browse images that already live in Pictures/Downloads/... .
  */
 import { readFile, readdir } from 'node:fs/promises'
-import { resolve, extname, join, sep } from 'node:path'
+import { resolve, extname, join, sep, delimiter } from 'node:path'
 import { homedir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 
@@ -20,6 +21,48 @@ const ASSET_ROOT = resolve(fileURLToPath(new URL('./assets/', import.meta.url)))
 // User images: default to ~/.dsh/background (a folder DSH users already have);
 // SIDEBAR_BG_DIR overrides it. A missing folder is fine — bundled assets only.
 const BG_DIR = process.env.SIDEBAR_BG_DIR || join(homedir(), '.dsh', 'background')
+// Extra read-only roots, so the picker can browse images that already live in
+// Pictures/Downloads/anywhere. Deliberately NOT an env var: a bundle patch
+// cannot set process env for the host, so an env-only switch would be
+// unreachable in practice. Read from a small JSON file instead, and accepted
+// from SIDEBAR_BG_DIRS as an override for scripted use.
+const CONFIG_FILE = join(homedir(), '.dsh', 'sidebar-bg.json')
+
+/** Split a directory list on the OS path delimiter (`:` on POSIX). */
+function splitDirs(value) {
+  return String(value || '')
+    .split(delimiter)
+    .map((d) => d.trim())
+    .filter(Boolean)
+    .map((d) => (d.startsWith('~') ? join(homedir(), d.slice(1)) : d))
+    .map((d) => resolve(d))
+}
+
+/** Extra roots from the config file, plus any SIDEBAR_BG_DIRS override. */
+async function readExtraDirs() {
+  let fromFile = []
+  try {
+    const raw = JSON.parse(await readFile(CONFIG_FILE, 'utf8'))
+    // Accept a bare array or { "dirs": [...] }.
+    fromFile = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.dirs) ? raw.dirs : [])
+  } catch { /* missing or malformed config is fine: bundled + default only */ }
+  const fromEnv = splitDirs(process.env.SIDEBAR_BG_DIRS)
+  // Deduplicate, and never let an extra root shadow the writable default.
+  const seen = new Set([BG_DIR])
+  const out = []
+  for (const dir of fromFile.concat(fromEnv)) {
+    const abs = String(dir || '').trim()
+    if (!abs || seen.has(abs)) continue
+    seen.add(abs)
+    out.push(abs)
+  }
+  return out
+}
+
+/** Every directory the picker may list from: the writable default, then extras. */
+async function roots() {
+  return [BG_DIR, ...(await readExtraDirs())]
+}
 
 const MIME = Object.freeze({
   '.webp': 'image/webp', '.png': 'image/png', '.jpg': 'image/jpeg',
@@ -50,12 +93,19 @@ async function serveAsset(req, res) {
 async function serveUserFile(req, res) {
   if (!BG_DIR) { res.writeHead(404); res.end(); return }
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405, { allow: 'GET, HEAD' }); res.end(); return }
-  const rel = safe(new URL(req.url ?? ROUTE, 'http://dsh.local').pathname.slice('/sidebar-bg/file/'.length))
-  // Images only. Without this the route serves ANY file in BG_DIR — a .env, a
+  // URL form: a bare file name (the writable default dir) or "rootIndex/file".
+  const raw = new URL(req.url ?? ROUTE, 'http://dsh.local').pathname.slice('/sidebar-bg/file/'.length)
+  const cut = raw.indexOf('/')
+  const rootIndex = cut === -1 ? 0 : Number(raw.slice(0, cut))
+  const rel = safe(cut === -1 ? raw : raw.slice(cut + 1))
+  const all = await roots()
+  // Images only. Without this the route serves ANY file in the roots — a .env, a
   // key, notes.txt — to any local client that asks for it.
-  if (!rel || !IMG_EXT.has(extname(rel).toLowerCase())) { res.writeHead(404); res.end(); return }
-  const full = resolve(BG_DIR, rel)
-  if (!full.startsWith(BG_DIR + sep)) { res.writeHead(403); res.end(); return }
+  if (!rel || !Number.isInteger(rootIndex) || rootIndex < 0 || rootIndex >= all.length) { res.writeHead(404); res.end(); return }
+  if (!IMG_EXT.has(extname(rel).toLowerCase())) { res.writeHead(404); res.end(); return }
+  const root = all[rootIndex]
+  const full = resolve(root, rel)
+  if (!full.startsWith(root + sep)) { res.writeHead(403); res.end(); return }
   try {
     const buf = await readFile(full)
     const type = MIME[extname(rel).toLowerCase()] ?? 'application/octet-stream'
@@ -71,14 +121,18 @@ async function serveListing(req, res) {
   const bundled = (await readdir(ASSET_ROOT).catch(() => []))
     .filter((f) => IMG_EXT.has(extOf(f)))
     .map((f) => ({ name: f, url: '/sidebar-bg/' + encodeURIComponent(f) }))
-  let user = []
-  if (BG_DIR) {
-    user = (await readdir(BG_DIR).catch(() => []))
-      .filter((f) => IMG_EXT.has(extOf(f)))
-      .map((f) => ({ name: f, url: '/sidebar-bg/file/' + encodeURIComponent(f) }))
-  }
+  // One group per root, so the picker can show ~/.dsh/background, Pictures,
+  // Downloads, ... side by side instead of a single flat list.
+  const groups = await Promise.all((await roots()).map(async (root, index) => ({
+    index,
+    dir: root,
+    images: (await readdir(root).catch(() => []))
+      .filter((f) => IMG_EXT.has(extOf(f)) && !f.startsWith('.'))
+      .map((f) => ({ name: f, url: '/sidebar-bg/file/' + index + '/' + encodeURIComponent(f) })),
+  })))
+  const user = groups.flatMap((g) => g.images)
   res.writeHead(200, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-cache' })
-  res.end(JSON.stringify({ dir: BG_DIR || null, images: bundled.concat(user) }))
+  res.end(JSON.stringify({ dir: BG_DIR || null, roots: groups, images: bundled.concat(user) }))
 }
 
 export function apply(ctx) {

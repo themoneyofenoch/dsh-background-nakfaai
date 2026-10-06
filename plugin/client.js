@@ -54,9 +54,15 @@ window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) 
     var rightSt = (zones.strength && zones.strength.right != null) ? zones.strength.right : 0.5;
     var rightVal = zones.right || DEFAULT.right;
     var rightBg = imgOverlay(rightVal, rightSt);
+    // Right zone. DSH 0.2.0 renders the native right bar as the AppFrame class
+    // `rightbarCol` (module _6Qf49G_): the old `rightCol` fragment no longer
+    // exists in any built stylesheet, and `workbench` / `bottomPanel` died in
+    // 0.1.7-rc.2. Keep every historical fragment so one file still works across
+    // host lines, newest first.
+    var RIGHT_SEL = 'div[class*="rightbarCol"], div[class*="sidebarRight"], div[class*="rightCol"], div[class*="workbench"], div[class*="bottomPanel"]';
     // Scoped to the right zone and its own panes: an app-wide [class*="_panel"]
     // rule paints backgrounds onto unrelated dialogs too.
-    css.push('div[class*="sidebarRight"], div[class*="rightCol"], div[class*="workbench"], div[class*="bottomPanel"], div[class*="sidebarRight"] div[class*="_panel"], div[class*="sidebarRight"] div[class*="_pane"], div[class*="rightCol"] div[class*="_panel"], div[class*="rightCol"] div[class*="_pane"] { background-image: ' + rightBg + ' !important; background-size: cover !important; background-position: center !important; background-repeat: no-repeat !important; }');
+    css.push(RIGHT_SEL + ', div[class*="rightbarCol"] div[class*="_panel"], div[class*="rightbarCol"] div[class*="_pane"], div[class*="sidebarRight"] div[class*="_panel"], div[class*="sidebarRight"] div[class*="_pane"], div[class*="rightCol"] div[class*="_panel"], div[class*="rightCol"] div[class*="_pane"] { background-image: ' + rightBg + ' !important; background-size: cover !important; background-position: center !important; background-repeat: no-repeat !important; }');
     // Strip the opaque inner surfaces that would otherwise cover the zone
     // images (hashed *_root / *_pane class fragments), and the sidebar content
     // panes that sit inside the workbench.
@@ -67,8 +73,11 @@ window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) 
     css.push('div[class*="centerCol"] div[class*="root"] { background: transparent !important; }');
     // Scoped: an unscoped [class*="_panel"] rule strips the background from
     // every panel in the app (approval dialogs, todo/plan panels, ...).
-    css.push('div[class*="sidebarRight"], div[class*="rightCol"], div[class*="bottomPanel"] { background: transparent !important; }');
-    css.push('div[class*="sidebarRight"] div[class*="_panel"], div[class*="sidebarRight"] div[class*="_pane"], div[class*="sidebarRight"] div[class*="_tabBar"], div[class*="rightCol"] div[class*="_panel"], div[class*="rightCol"] div[class*="_pane"], div[class*="rightCol"] div[class*="_tabBar"] { background: transparent !important; }');
+    // DSH 0.2.0's native right bar is `rightbarCol`; `sidebarRight`/`rightCol`
+    // are kept for the 0.1.7 line. Nothing matches `workbench`/`bottomPanel` any
+    // more, but the rules are inert rather than harmful.
+    css.push('div[class*="rightbarCol"], div[class*="sidebarRight"], div[class*="rightCol"], div[class*="bottomPanel"] { background: transparent !important; }');
+    css.push('div[class*="rightbarCol"] div[class*="_panel"], div[class*="rightbarCol"] div[class*="_pane"], div[class*="rightbarCol"] div[class*="_tabBar"], div[class*="sidebarRight"] div[class*="_panel"], div[class*="sidebarRight"] div[class*="_pane"], div[class*="sidebarRight"] div[class*="_tabBar"], div[class*="rightCol"] div[class*="_panel"], div[class*="rightCol"] div[class*="_pane"], div[class*="rightCol"] div[class*="_tabBar"] { background: transparent !important; }');
     css.push('div[class*="wxwsGW_jobs"], div[class*="wxwsGW_subagent"] { background: transparent !important; }');
     var style = document.getElementById(STYLE_ID);
     if (!style) { style = document.createElement('style'); style.id = STYLE_ID; document.head.appendChild(style); }
@@ -252,14 +261,14 @@ window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) 
     var h = react.createElement;
     var zonesState = react.useState(loadZones());
     var zones = zonesState[0], setZones = zonesState[1];
-    var listState = react.useState({ dir: '', images: [] });
+    var listState = react.useState({ dir: '', images: [], roots: [] });
     var listing = listState[0], setListing = listState[1];
 
     react.useEffect(function () {
       var alive = true;
       fetch('/sidebar-bg/list.json').then(function (r) { return r.json(); }).then(function (d) {
-        if (alive) setListing({ dir: (d && d.dir) || '', images: (d && d.images) || [] });
-      }).catch(function () { if (alive) setListing({ dir: '', images: [] }); });
+        if (alive) setListing({ dir: (d && d.dir) || '', images: (d && d.images) || [], roots: (d && d.roots) || [] });
+      }).catch(function () { if (alive) setListing({ dir: '', images: [], roots: [] }); });
       return function () { alive = false; };
     }, []);
 
@@ -277,8 +286,19 @@ window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) 
     }
 
     var rows = ['left', 'main', 'right'].map(function (key) {
-      var options = [{ value: '', label: key === 'right' ? '(default)' : '(default / hide)' }]
-        .concat(listing.images.map(function (im) { return { value: im.url, label: im.name }; }));
+      // Group the choices by source directory (optgroup), so images from
+      // ~/.dsh/background, Pictures, Downloads, ... stay distinguishable even
+      // when several folders contain files with the same name.
+      var options = [{ value: '', label: key === 'right' ? '(default)' : '(default / hide)' }];
+      var groups = listing.roots && listing.roots.length
+        ? listing.roots
+        : [{ dir: listing.dir, images: listing.images }];
+      groups.forEach(function (g) {
+        if (!g.images || !g.images.length) return;
+        var label = g.dir ? shortDir(g.dir) : 'Images';
+        if (g.images.length === 1) { options.push({ value: g.images[0].url, label: g.images[0].name }); return; }
+        options.push({ group: label, items: g.images.map(function (im) { return { value: im.url, label: im.name }; }) });
+      });
       var pct = Math.round(zoneStrength(zones, key) * 100);
       return h('div', { key: key, style: { margin: '10px 0' } }, [
         h('div', { key: 'label', style: { fontSize: 12, color: '#8b93a3', marginBottom: 4 } }, ZONE_LABELS[key]),
@@ -287,7 +307,13 @@ window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) 
           value: zones[key] || '',
           onChange: function (e) { pickImage(key, e.target.value); },
           style: { width: '100%', padding: '6px', background: '#0d0f14', color: '#e6e8ee', border: '1px solid #2a2f3a', borderRadius: 6 }
-        }, options.map(function (o) { return h('option', { key: o.value || 'none', value: o.value }, o.label); })),
+        }, options.map(function (o) {
+          if (o.group) {
+            return h('optgroup', { key: 'g:' + o.group, label: o.group },
+              o.items.map(function (it) { return h('option', { key: it.value, value: it.value }, it.label); }));
+          }
+          return h('option', { key: o.value || 'none', value: o.value }, o.label);
+        })),
         h('div', { key: 'strength', style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 } }, [
           h('span', { key: 'a', style: { fontSize: 11, color: '#8b93a3', width: 42 } }, 'Strong'),
           h('input', {
@@ -301,11 +327,18 @@ window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) 
       ]);
     });
 
+    var searched = (listing.roots || []).map(function (g) { return g.dir; }).filter(Boolean);
     return h('div', null, [
       h('div', { key: 'title', style: { fontWeight: 700, fontSize: 14, marginBottom: 6 } }, 'Background'),
       h('div', { key: 'hint', style: { fontSize: 12, color: '#8b93a3' } },
-        listing.dir ? ('Images in ' + listing.dir) : (listing.images.length ? '' : 'No images found — the bundled default is used')),
-      h('div', { key: 'rows' }, rows)
+        listing.images.length
+          ? ('Images from ' + (searched.length ? searched.map(shortDir).join(', ') : 'the bundled default'))
+          : 'No images found — the bundled default is used'),
+      h('div', { key: 'rows' }, rows),
+      h('div', { key: 'howto', style: { fontSize: 11, color: '#6d7686', marginTop: 10, lineHeight: 1.5 } },
+        'Add more folders by listing them in ~/.dsh/sidebar-bg.json, e.g. ' +
+        '{"dirs":["~/Pictures","~/Downloads"]}. Everything in ' +
+        (listing.dir ? shortDir(listing.dir) : '~/.dsh/background') + ' stays in the first group.')
     ]);
   }
 
@@ -320,6 +353,16 @@ window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) 
   // which fails the whole web boot. `settings.section` is a plain
   // { kind: 'list', scope: 'root' } slot with no children table, so this plugin
   // must render its own config inline here instead of registering a child slot.
+  // `SIDEBAR_BG_DIRS` is colon-separated; shown in the settings hint so the
+  // feature is discoverable without reading the README.
+  /** Abbreviate a home-anchored path to `~/...` for the optgroup labels. */
+  function shortDir(dir) {
+    var s = String(dir || '');
+    var m = /^\/(?:Users|home)\/[^/]+(\/.*)?$/.exec(s);
+    if (m) return '~' + (m[1] || '');
+    return s;
+  }
+
   function BackgroundSection() {
     var h = react.createElement;
     return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
