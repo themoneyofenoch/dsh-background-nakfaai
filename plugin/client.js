@@ -314,11 +314,16 @@ window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) 
   // the theme/skin section, not on the Plugins page. Registers a settings
   // section plus its own child slot, the same shape the skin plugin uses.
   // ---------------------------------------------------------------------------
-  function BackgroundSection(props) {
+  // DSH 0.2.0 declares every `settings.*` slot itself and enforces slot
+  // ownership: injecting a key no registration declared throws
+  // SlotOwnershipError("slot 'X' is not declared by this entry's children"),
+  // which fails the whole web boot. `settings.section` is a plain
+  // { kind: 'list', scope: 'root' } slot with no children table, so this plugin
+  // must render its own config inline here instead of registering a child slot.
+  function BackgroundSection() {
     var h = react.createElement;
-    var renderSlot = props && props.renderSlot;
     return h('div', { style: { display: 'flex', flexDirection: 'column', gap: 4 } },
-      typeof renderSlot === 'function' ? renderSlot('settings.background.item', {}) : null);
+      h(BackgroundConfig, null));
   }
 
   exports.name = 'dsh-background-nakfaai';
@@ -336,8 +341,9 @@ window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) 
       if (++tries > 8) clearInterval(timer);
     }, 1000);
     // Settings → "Background" section (next to the theme/skin section).
-    // "settings.section" is a list slot (needs id); its children table declares
-    // the row slot this plugin then fills.
+    // "settings.section" is a list slot (needs id). It declares NO children in
+    // DSH 0.2.0, so the config UI is rendered inline by BackgroundSection
+    // rather than through a child slot registration (see the note above it).
     if (react && ctx.slots && typeof ctx.slots.inject === 'function') {
       var disposeSection = ctx.slots.inject('settings.section', function () {
         try {
@@ -345,23 +351,11 @@ window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) 
             name: 'settings.section',
             id: 'sidebar-bg',
             order: 12,
-            label: 'Background',
-            children: { 'settings.background.item': { kind: 'list', scope: 'root' } }
+            label: 'Background'
           }, BackgroundSection);
         } catch (e) { return undefined; }
       });
-      var disposeRows = ctx.slots.inject('settings.background.item', function () {
-        try {
-          return ctx.slots.register({
-            name: 'settings.background.item',
-            id: 'sidebar-bg',
-            order: 10,
-            inject: function () { return {}; }
-          }, BackgroundConfig);
-        } catch (e) { return undefined; }
-      });
       ctx.effect(function () {
-        if (typeof disposeRows === 'function') disposeRows();
         if (typeof disposeSection === 'function') disposeSection();
       }, 'sidebar-bg: settings section');
     }
