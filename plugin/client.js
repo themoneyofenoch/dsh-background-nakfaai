@@ -1,17 +1,21 @@
 // sidebar-bg client half — paints the left/main/right zones with per-zone images
 // and provides a small picker (button + panel) to change each one yourself.
-window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) => {
-  var module = { exports: {} };
-  var exports = module.exports;
-
+//
+// DSH 0.2.0 contract: the browser half is an async function BODY that must
+// `return` a plugin (a function, or an object with `apply(ctx)`). The shell
+// evaluates it as `new Function(..., 'return (async () => { <this file> })()')`
+// and injects React as the first parameter. The old
+// `window.__ModuleLoader__.load({ id, factory })` form returns `undefined`
+// under 0.2.0 and fails activation ("client half returned undefined"), which
+// gates the whole web boot.
   var STYLE_ID = 'sidebar-bg-css';
   var PANEL_ID = 'sidebar-bg-panel';
   var BTN_ID = 'sidebar-bg-btn';
   var STORAGE_KEY = 'sidebar-bg-zones';
-  // React comes from the client module table (a platform seed). Guarded so an
-  // older shell without it still gets the floating picker below.
-  var react = null;
-  try { react = require('react'); } catch (e) { react = null; }
+  // React arrives as a parameter (no require in 0.2.0). Kept under `react` so
+  // the element-building code below reads unchanged; guarded so a shell that
+  // omits it still gets the floating DOM picker.
+  var react = (typeof React !== 'undefined' && React) ? React : null;
   var DEFAULT = { left: '/sidebar-bg/sidebar.webp', main: '/sidebar-bg/sidebar.webp', right: '/sidebar-bg/sidebar.webp', strength: { left: 0.6, main: 0.4, right: 0.5 } };
 
   function loadZones() {
@@ -369,9 +373,10 @@ window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) 
       h(BackgroundConfig, null));
   }
 
-  exports.name = 'dsh-background-nakfaai';
-  exports.inject = [];
-  exports.apply = function apply(ctx) {
+  var plugin = {
+    name: 'dsh-background-nakfaai',
+    inject: [],
+    apply: function apply(ctx) {
     function init() {
       injectCss();
       addButton();
@@ -419,7 +424,9 @@ window.__ModuleLoader__.load({ id: 'dsh-background-nakfaai', factory: (require) 
       var style = document.getElementById(STYLE_ID);
       if (style) style.remove();
     }, 'sidebar-bg: picker');
+    }
   };
 
-  return module.exports;
-} });
+  // DSH 0.2.0 evaluates this file as an async function body and requires the
+  // returned value to be a plugin (function, or object with `apply`).
+  return plugin;
