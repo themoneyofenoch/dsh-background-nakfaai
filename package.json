@@ -1,6 +1,6 @@
 {
   "name": "dsh-background-nakfaai",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "type": "module",
   "description": "A DeepSeek Harness background skin: per-zone (left bar / main / right workbench) background images with a picker and strength control.",
   "repository": {
@@ -34,7 +34,11 @@
       "patch": "./cordis.patch.yml"
     },
     "client": {
-      "inject": [],
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ],
       "platform": "web",
       "immediately": true
     }
